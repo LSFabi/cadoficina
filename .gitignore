@@ -31,3 +31,6 @@ backend/storage/pail
 backend/public/storage
 backend/public/build
 backend/public/hot
+backend/.claude.json
+backend/.claude.json.backup
+backend/.gitconfig
