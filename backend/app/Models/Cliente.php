@@ -20,4 +20,9 @@ class Cliente extends Model
         'consentimento_lgpd',
         'data_consentimento',
     ];
+
+    public function getRouteKeyName(): string
+    {
+        return 'id_cliente';
+    }
 }
