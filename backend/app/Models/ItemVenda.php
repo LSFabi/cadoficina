@@ -15,7 +15,6 @@ class ItemVenda extends Model
         'id_variacao',
         'quantidade',
         'preco_unitario',
-        'subtotal',
     ];
 
     public function venda()

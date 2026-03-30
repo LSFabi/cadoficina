@@ -12,7 +12,8 @@ Route::apiResource('categorias', CategoriaController::class);
 Route::apiResource('produtos', ProdutoController::class);
 Route::apiResource('fornecedores', FornecedorController::class);
 
-// Venda — ciclo controlado (update e destroy serão adicionados em fases posteriores)
+// Venda — ciclo controlado
 Route::get('vendas', [VendaController::class, 'index']);
 Route::get('vendas/{venda}', [VendaController::class, 'show']);
 Route::post('vendas', [VendaController::class, 'store']);
+Route::post('vendas/{venda}/itens', [VendaController::class, 'addItem']);
