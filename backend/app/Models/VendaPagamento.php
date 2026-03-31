@@ -17,7 +17,7 @@ class VendaPagamento extends Model
         'valor',
         'parcelas',
         'valor_recebido',
-        'troco',
+        // troco: STORED GENERATED (banco calcula como valor_recebido - valor)
         'status',
     ];
 

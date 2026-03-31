@@ -18,7 +18,7 @@ class VendaController extends Controller
     public function show(Venda $venda)
     {
         return response()->json(
-            $venda->load(['cliente', 'usuario'])
+            $venda->load(['cliente', 'usuario', 'itens', 'pagamentos'])
         );
     }
 
@@ -39,6 +39,54 @@ class VendaController extends Controller
         ]);
 
         return response()->json($venda->load(['cliente', 'usuario']), 201);
+    }
+
+    public function reabrir(Venda $venda)
+    {
+        if ($venda->status !== 'cancelada') {
+            return response()->json(['message' => 'Apenas vendas canceladas podem ser reabertas.'], 422);
+        }
+
+        $pagamentosAtivos = $venda->pagamentos()->where('status', 'ativo')->count();
+
+        if ($pagamentosAtivos > 0) {
+            return response()->json([
+                'message' => 'Existem pagamentos ativos vinculados a esta venda. Estorne todos os pagamentos antes de reabrir.',
+            ], 422);
+        }
+
+        $venda->update([
+            'status'              => 'rascunho',
+            'motivo_cancelamento' => null,
+            'data_cancelamento'   => null,
+        ]);
+
+        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
+    }
+
+    public function cancel(Request $request, Venda $venda)
+    {
+        if ($venda->status === 'cancelada') {
+            return response()->json(['message' => 'Venda já está cancelada.'], 422);
+        }
+
+        if (!in_array($venda->status, ['rascunho', 'concluida'])) {
+            return response()->json([
+                'message' => 'Apenas vendas em status rascunho ou concluida podem ser canceladas.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'motivo_cancelamento' => 'required|string',
+        ]);
+
+        $venda->update([
+            'status'              => 'cancelada',
+            'motivo_cancelamento' => $validated['motivo_cancelamento'],
+            'data_cancelamento'   => now(),
+        ]);
+
+        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
     }
 
     public function addItem(Request $request, Venda $venda)

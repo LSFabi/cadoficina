@@ -29,4 +29,14 @@ class Venda extends Model
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'id_usuario');
     }
+
+    public function itens()
+    {
+        return $this->hasMany(ItemVenda::class, 'id_venda', 'id_venda');
+    }
+
+    public function pagamentos()
+    {
+        return $this->hasMany(VendaPagamento::class, 'id_venda', 'id_venda');
+    }
 }
