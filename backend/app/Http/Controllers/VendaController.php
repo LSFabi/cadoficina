@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ItemVenda;
+use App\Models\MovEstoque;
+use App\Models\ProdutoVariacao;
 use App\Models\Venda;
 use Illuminate\Http\Request;
 
@@ -39,6 +41,29 @@ class VendaController extends Controller
         ]);
 
         return response()->json($venda->load(['cliente', 'usuario']), 201);
+    }
+
+    public function confirmar(Venda $venda)
+    {
+        if ($venda->status !== 'rascunho') {
+            return response()->json(['message' => 'Apenas vendas em status rascunho podem ser confirmadas.'], 422);
+        }
+
+        if ($venda->itens()->count() === 0) {
+            return response()->json(['message' => 'A venda não possui itens.'], 422);
+        }
+
+        if ($venda->valor_total <= 0) {
+            return response()->json(['message' => 'O valor total da venda deve ser maior que zero.'], 422);
+        }
+
+        if ($venda->pagamentos()->where('status', 'ativo')->count() > 0) {
+            return response()->json(['message' => 'Venda com pagamento ativo não pode ser reconfirmada.'], 422);
+        }
+
+        $venda->update(['status' => 'concluida']);
+
+        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
     }
 
     public function reabrir(Venda $venda)
@@ -85,6 +110,34 @@ class VendaController extends Controller
             'motivo_cancelamento' => $validated['motivo_cancelamento'],
             'data_cancelamento'   => now(),
         ]);
+
+        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
+    }
+
+    public function removeItem(Venda $venda, ItemVenda $item)
+    {
+        if ($item->id_venda !== $venda->id_venda) {
+            return response()->json(['message' => 'Item não pertence a esta venda.'], 422);
+        }
+
+        if ($venda->status !== 'rascunho') {
+            return response()->json(['message' => 'Itens só podem ser removidos de vendas em status rascunho.'], 422);
+        }
+
+        $variacao = ProdutoVariacao::find($item->id_variacao);
+        $variacao->increment('qtd_estoque', $item->quantidade);
+
+        MovEstoque::create([
+            'id_variacao' => $item->id_variacao,
+            'tipo'        => 'entrada',
+            'quantidade'  => $item->quantidade,
+            'motivo'      => 'Remocao item venda',
+        ]);
+
+        $item->delete();
+
+        $novoTotal = ItemVenda::where('id_venda', $venda->id_venda)->sum('subtotal') - $venda->desconto;
+        $venda->update(['valor_total' => max(0, $novoTotal)]);
 
         return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
     }

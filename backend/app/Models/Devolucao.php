@@ -38,4 +38,9 @@ class Devolucao extends Model
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'id_usuario');
     }
+
+    public function itens()
+    {
+        return $this->hasMany(ItemDevolucao::class, 'id_devolucao', 'id_devolucao');
+    }
 }
