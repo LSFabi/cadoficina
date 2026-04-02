@@ -6,6 +6,7 @@ use App\Models\CreditoLoja;
 use App\Models\Venda;
 use App\Models\VendaPagamento;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VendaPagamentoController extends Controller
 {
@@ -55,36 +56,40 @@ class VendaPagamentoController extends Controller
             return response()->json(['message' => 'Venda com valor total zero não pode receber pagamento.'], 422);
         }
 
-        $pagamento = VendaPagamento::create([
-            'id_venda'        => $venda->id_venda,
-            'id_credito'      => $validated['id_credito'] ?? null,
-            'forma_pagamento' => $validated['forma_pagamento'],
-            'valor'           => $validated['valor'],
-            'parcelas'        => $validated['parcelas'] ?? 1,
-            'valor_recebido'  => $validated['valor_recebido'] ?? null,
-            // troco: STORED GENERATED — não inserir
-            // status default 'ativo' pelo banco — não inserir
-        ]);
+        $result = DB::transaction(function () use ($validated, $venda, $credito) {
+            $pagamento = VendaPagamento::create([
+                'id_venda'        => $venda->id_venda,
+                'id_credito'      => $validated['id_credito'] ?? null,
+                'forma_pagamento' => $validated['forma_pagamento'],
+                'valor'           => $validated['valor'],
+                'parcelas'        => $validated['parcelas'] ?? 1,
+                'valor_recebido'  => $validated['valor_recebido'] ?? null,
+                // troco: STORED GENERATED — não inserir
+                // status default 'ativo' pelo banco — não inserir
+            ]);
 
-        $pagamento->refresh();
+            $pagamento->refresh();
 
-        // Consumir crédito da loja após pagamento inserido
-        if ($credito) {
-            $novoUtilizado = $credito->valor_utilizado + $validated['valor'];
-            $credito->valor_utilizado = $novoUtilizado;
-            // valor_saldo é STORED GENERATED — banco recalcula como valor_original - valor_utilizado
-            // Se saldo zerar, marcar como utilizado
-            $novoSaldo = $credito->valor_original - $novoUtilizado;
-            $credito->status = $novoSaldo <= 0 ? 'utilizado' : 'disponivel';
-            $credito->save();
-            $credito->refresh();
-        }
+            // Consumir crédito da loja após pagamento inserido
+            if ($credito) {
+                $novoUtilizado = $credito->valor_utilizado + $validated['valor'];
+                $credito->valor_utilizado = $novoUtilizado;
+                // valor_saldo é STORED GENERATED — banco recalcula como valor_original - valor_utilizado
+                // Se saldo zerar, marcar como utilizado
+                $novoSaldo = $credito->valor_original - $novoUtilizado;
+                $credito->status = $novoSaldo <= 0 ? 'utilizado' : 'disponivel';
+                $credito->save();
+                $credito->refresh();
+            }
 
-        return response()->json([
-            'pagamento' => $pagamento,
-            'venda'     => $venda->fresh(['cliente', 'usuario']),
-            'credito'   => $credito,
-        ], 201);
+            return [
+                'pagamento' => $pagamento,
+                'venda'     => $venda->fresh(['cliente', 'usuario']),
+                'credito'   => $credito,
+            ];
+        });
+
+        return response()->json($result, 201);
     }
 
     public function estornar(VendaPagamento $pagamento)

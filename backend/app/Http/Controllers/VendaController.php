@@ -7,6 +7,7 @@ use App\Models\MovEstoque;
 use App\Models\ProdutoVariacao;
 use App\Models\Venda;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VendaController extends Controller
 {
@@ -124,22 +125,26 @@ class VendaController extends Controller
             return response()->json(['message' => 'Itens só podem ser removidos de vendas em status rascunho.'], 422);
         }
 
-        $variacao = ProdutoVariacao::find($item->id_variacao);
-        $variacao->increment('qtd_estoque', $item->quantidade);
+        $result = DB::transaction(function () use ($venda, $item) {
+            $variacao = ProdutoVariacao::find($item->id_variacao);
+            $variacao->increment('qtd_estoque', $item->quantidade);
 
-        MovEstoque::create([
-            'id_variacao' => $item->id_variacao,
-            'tipo'        => 'entrada',
-            'quantidade'  => $item->quantidade,
-            'motivo'      => 'Remocao item venda',
-        ]);
+            MovEstoque::create([
+                'id_variacao' => $item->id_variacao,
+                'tipo'        => 'entrada',
+                'quantidade'  => $item->quantidade,
+                'motivo'      => 'Remocao item venda',
+            ]);
 
-        $item->delete();
+            $item->delete();
 
-        $novoTotal = ItemVenda::where('id_venda', $venda->id_venda)->sum('subtotal') - $venda->desconto;
-        $venda->update(['valor_total' => max(0, $novoTotal)]);
+            $novoTotal = ItemVenda::where('id_venda', $venda->id_venda)->sum('subtotal') - $venda->desconto;
+            $venda->update(['valor_total' => max(0, $novoTotal)]);
 
-        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
+            return $venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']);
+        });
+
+        return response()->json($result);
     }
 
     public function addItem(Request $request, Venda $venda)

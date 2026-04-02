@@ -8,6 +8,7 @@ use App\Models\ItemDevolucao;
 use App\Models\MovEstoque;
 use App\Models\ProdutoVariacao;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DevolucaoController extends Controller
 {
@@ -43,38 +44,42 @@ class DevolucaoController extends Controller
             'descricao_item'=> 'nullable|string',
         ]);
 
-        $item = ItemDevolucao::create([
-            'id_devolucao'  => $devolucao->id_devolucao,
-            'id_variacao'   => $validated['id_variacao'],
-            'quantidade'    => $validated['quantidade'],
-            'valor_unitario'=> $validated['valor_unitario'],
-            'descricao_item'=> $validated['descricao_item'] ?? null,
-        ]);
+        $result = DB::transaction(function () use ($validated, $devolucao) {
+            $item = ItemDevolucao::create([
+                'id_devolucao'  => $devolucao->id_devolucao,
+                'id_variacao'   => $validated['id_variacao'],
+                'quantidade'    => $validated['quantidade'],
+                'valor_unitario'=> $validated['valor_unitario'],
+                'descricao_item'=> $validated['descricao_item'] ?? null,
+            ]);
 
-        $variacao = ProdutoVariacao::find($validated['id_variacao']);
-        $variacao->increment('qtd_estoque', $validated['quantidade']);
+            $variacao = ProdutoVariacao::find($validated['id_variacao']);
+            $variacao->increment('qtd_estoque', $validated['quantidade']);
 
-        MovEstoque::create([
-            'id_variacao' => $validated['id_variacao'],
-            'tipo'        => 'devolucao',
-            'quantidade'  => $validated['quantidade'],
-            'motivo'      => 'Devolucao item venda',
-        ]);
+            MovEstoque::create([
+                'id_variacao' => $validated['id_variacao'],
+                'tipo'        => 'devolucao',
+                'quantidade'  => $validated['quantidade'],
+                'motivo'      => 'Devolucao item venda',
+            ]);
 
-        // valor_saldo: STORED GENERATED — não inserir
-        // valor_utilizado: default=0.00, status: default='disponivel' — banco aplica
-        $credito = CreditoLoja::create([
-            'id_devolucao'  => $devolucao->id_devolucao,
-            'id_cliente'    => $devolucao->id_cliente,
-            'origem'        => 'devolucao',
-            'valor_original'=> $validated['quantidade'] * $validated['valor_unitario'],
-        ]);
+            // valor_saldo: STORED GENERATED — não inserir
+            // valor_utilizado: default=0.00, status: default='disponivel' — banco aplica
+            $credito = CreditoLoja::create([
+                'id_devolucao'  => $devolucao->id_devolucao,
+                'id_cliente'    => $devolucao->id_cliente,
+                'origem'        => 'devolucao',
+                'valor_original'=> $validated['quantidade'] * $validated['valor_unitario'],
+            ]);
 
-        $credito->refresh();
+            $credito->refresh();
 
-        return response()->json([
-            'item'      => $item,
-            'devolucao' => $devolucao->fresh(['venda', 'cliente', 'usuario', 'itens']),
-        ], 201);
+            return [
+                'item'      => $item,
+                'devolucao' => $devolucao->fresh(['venda', 'cliente', 'usuario', 'itens']),
+            ];
+        });
+
+        return response()->json($result, 201);
     }
 }
