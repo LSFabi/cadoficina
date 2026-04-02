@@ -56,6 +56,7 @@ class VendaPagamentoController extends Controller
             return response()->json(['message' => 'Venda com valor total zero não pode receber pagamento.'], 422);
         }
 
+        try {
         $result = DB::transaction(function () use ($validated, $venda, $credito) {
             $pagamento = VendaPagamento::create([
                 'id_venda'        => $venda->id_venda,
@@ -90,6 +91,9 @@ class VendaPagamentoController extends Controller
         });
 
         return response()->json($result, 201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erro interno.', 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function estornar(VendaPagamento $pagamento)

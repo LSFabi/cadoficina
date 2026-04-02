@@ -21,7 +21,7 @@ class VendaController extends Controller
     public function show(Venda $venda)
     {
         return response()->json(
-            $venda->load(['cliente', 'usuario', 'itens', 'pagamentos'])
+            Venda::completa()->find($venda->id_venda)
         );
     }
 
@@ -64,7 +64,7 @@ class VendaController extends Controller
 
         $venda->update(['status' => 'concluida']);
 
-        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
+        return response()->json(Venda::completa()->find($venda->id_venda));
     }
 
     public function reabrir(Venda $venda)
@@ -87,7 +87,7 @@ class VendaController extends Controller
             'data_cancelamento'   => null,
         ]);
 
-        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
+        return response()->json(Venda::completa()->find($venda->id_venda));
     }
 
     public function cancel(Request $request, Venda $venda)
@@ -112,7 +112,7 @@ class VendaController extends Controller
             'data_cancelamento'   => now(),
         ]);
 
-        return response()->json($venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']));
+        return response()->json(Venda::completa()->find($venda->id_venda));
     }
 
     public function removeItem(Venda $venda, ItemVenda $item)
@@ -125,6 +125,7 @@ class VendaController extends Controller
             return response()->json(['message' => 'Itens só podem ser removidos de vendas em status rascunho.'], 422);
         }
 
+        try {
         $result = DB::transaction(function () use ($venda, $item) {
             $variacao = ProdutoVariacao::find($item->id_variacao);
             $variacao->increment('qtd_estoque', $item->quantidade);
@@ -141,10 +142,13 @@ class VendaController extends Controller
             $novoTotal = ItemVenda::where('id_venda', $venda->id_venda)->sum('subtotal') - $venda->desconto;
             $venda->update(['valor_total' => max(0, $novoTotal)]);
 
-            return $venda->fresh(['cliente', 'usuario', 'itens', 'pagamentos']);
+            return Venda::completa()->find($venda->id_venda);
         });
 
         return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erro interno.', 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function addItem(Request $request, Venda $venda)

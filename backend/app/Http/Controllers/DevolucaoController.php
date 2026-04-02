@@ -44,6 +44,7 @@ class DevolucaoController extends Controller
             'descricao_item'=> 'nullable|string',
         ]);
 
+        try {
         $result = DB::transaction(function () use ($validated, $devolucao) {
             $item = ItemDevolucao::create([
                 'id_devolucao'  => $devolucao->id_devolucao,
@@ -81,5 +82,8 @@ class DevolucaoController extends Controller
         });
 
         return response()->json($result, 201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Erro interno.', 'error' => $e->getMessage()], 500);
+        }
     }
 }

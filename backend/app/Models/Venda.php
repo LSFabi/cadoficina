@@ -20,6 +20,11 @@ class Venda extends Model
         'data_cancelamento',
     ];
 
+    public function scopeCompleta($query)
+    {
+        return $query->with(['cliente', 'usuario', 'itens', 'pagamentos']);
+    }
+
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'id_cliente', 'id_cliente');
