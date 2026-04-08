@@ -7,11 +7,15 @@ use App\Models\Devolucao;
 use App\Models\ItemDevolucao;
 use App\Models\MovEstoque;
 use App\Models\ProdutoVariacao;
+use App\Services\DevolucaoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class DevolucaoController extends Controller
 {
+    public function __construct(private DevolucaoService $devolucaoService) {}
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -22,17 +26,7 @@ class DevolucaoController extends Controller
             'observacao' => 'nullable|string',
         ]);
 
-        // id_condicional permanece null nesta fase
-        // data_devolucao gerado pelo banco (DEFAULT_GENERATED)
-        $devolucao = Devolucao::create([
-            'id_venda'   => $validated['id_venda'],
-            'id_cliente' => $validated['id_cliente'] ?? null,
-            'id_usuario' => $validated['id_usuario'] ?? null,
-            'tipo'       => $validated['tipo'],
-            'observacao' => $validated['observacao'] ?? null,
-        ]);
-
-        return response()->json($devolucao->fresh(['venda', 'cliente', 'usuario']), 201);
+        return response()->json($this->devolucaoService->criar($validated), 201);
     }
 
     public function addItem(Request $request, Devolucao $devolucao)
@@ -43,6 +37,15 @@ class DevolucaoController extends Controller
             'valor_unitario'=> 'required|numeric|min:0',
             'descricao_item'=> 'nullable|string',
         ]);
+
+        // Guard: impedir crédito duplicado para o mesmo item na mesma devolução
+        if (ItemDevolucao::where('id_devolucao', $devolucao->id_devolucao)
+                ->where('id_variacao', $validated['id_variacao'])
+                ->exists()) {
+            throw ValidationException::withMessages([
+                'message' => ['Este item já foi registrado nesta devolução.'],
+            ]);
+        }
 
         try {
         $result = DB::transaction(function () use ($validated, $devolucao) {

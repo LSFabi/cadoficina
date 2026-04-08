@@ -27,4 +27,9 @@ class Condicional extends Model
     {
         return $this->belongsTo(Usuario::class, 'id_usuario', 'id_usuario');
     }
+
+    public function itens()
+    {
+        return $this->hasMany(ItemCondicional::class, 'id_condicional', 'id_condicional');
+    }
 }

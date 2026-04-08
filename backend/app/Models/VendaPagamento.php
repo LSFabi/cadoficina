@@ -21,6 +21,16 @@ class VendaPagamento extends Model
         'status',
     ];
 
+    public function scopeAtivos($query)
+    {
+        return $query->where('status', 'ativo');
+    }
+
+    public function scopeEstornados($query)
+    {
+        return $query->where('status', 'estornado');
+    }
+
     public function venda()
     {
         return $this->belongsTo(Venda::class, 'id_venda', 'id_venda');
