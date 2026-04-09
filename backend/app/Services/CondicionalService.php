@@ -35,7 +35,7 @@ class CondicionalService
             throw ValidationException::withMessages(['message' => ['Condicional não está aberto para adição de itens.']]);
         }
 
-        $variacao = ProdutoVariacao::find($dados['id_variacao']);
+        $variacao = ProdutoVariacao::findOrFail($dados['id_variacao']);
 
         if ($variacao->qtd_estoque < $dados['qtd_retirada']) {
             throw ValidationException::withMessages(['message' => ['Estoque insuficiente para a quantidade solicitada.']]);
@@ -184,6 +184,13 @@ class CondicionalService
 
         if ($itens->isEmpty()) {
             $condicional->update(['status' => 'devolvido']);
+            return;
+        }
+
+        $statusAtual = $condicional->fresh()->status;
+
+        if (in_array($statusAtual, ['vencido', 'parcial_vencido'])) {
+            $condicional->update(['status' => 'parcial_vencido']);
         } else {
             $condicional->update(['status' => 'parcial']);
         }
